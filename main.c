@@ -1,67 +1,145 @@
-//Names: Becky Ren Haritima Manchanda
-//Final Project
-//Description: This program creates a ping pong game to be played on two pis via client and server connection
+#define _GNU_SOURCE
 #include <stdio.h>
-#include<stdlib.h>
+#include <stdlib.h>
 #include <unistd.h>
-#include <netdb.h>
-#include <string.h>
-#include <sys.types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
 #include <signal.h>
-#include "sense.h"
-int running = 1;
-//function to stop program
-void InterruptHandler(int sig){
-	printf("Game stopped");
-	running =0;
+#include <sense/sense.h>
+#include <linux/input.h>
+
+#define SPEED 1 // SPEED: the speed of the paddle with which it moves when joystick is pressed either left or right. 
+
+int run = 1; // Keeps account of whether the program is running
+int score = 0;
+int runJoyStick = 0; // Keeps account of whether joystick is running and also the direction (left or right) in which it is pressed 
+
+pi_framebuffer_t *fb;
+
+typedef struct
+{
+	int ballx;
+	int bally;
+	int ballxprev;
+	int ballyprev;
+}gamestate_t;
+
+// handler() : Exits the program on ctrl C
+void handler(int sig){
+	printf("\nEXITING...\n");
+	run = 0;
 }
-//function to print an error and exit program
-void error(char *msg){
-	perror(msg);
-	exit(0);}
 
-//server_socketCreate: creates the server socket using socket()
-int server_socketCreate(){
-	int server_socket;
-	printf("Create the socket\n");
-	server_socket = socket(AF_INET,SOCK_STREAM,0);
-	return server_socket;}
-
-//client_socketCreate()creates the client socket using socket()	
-int client_socketCreate(){
-	int client_socket;
-	printf("Create the socket\n");
-	client_socket = socket(AF_INET_SOCK_STREAM,IPROTO_TCP);
-	return client_socket;}	
-//bindCreatedSocket binds the socket
-int bindCreatedSocket(int server_socket, int portno){
-	int n = -1;
-	struct sockaddr_in serv_addr;
-	bzero((char*)&serv_addr,sizeof(serv_addr));
-	serv_addr.sin_family = AF_INET;
-	serv_addr.sin_addr.s_addr = INADDR_ANY;
-	serv_addr.sin_port = htons(portno);
-	n = bind(server_socket,(struct sockaddr*)&serv_addr,sizeof(serv_addr));
-	return n;}
-
-int main(int argc, char *argv[]){
-	int sockfd, newsockfd,portno,clilen;
-	struct sockaddr_in serv_addr,cli_addr;
-	struct hostent *server;
-	char buffer[256];
-	char newbuffer[1024];
-	//check to start as server or client
-	if(argc==2){
-		portno = atoi(argv[1]);}
-	else if (argc==3){
-		portno = atoi(argc[1]);
-		server = gethostbyname(argv[2])
+void callbackFn(unsigned int code)
+{
+	switch(code)
+	{
+		case KEY_RIGHT:
+			runJoyStick = 1;
+			break;
+		case KEY_LEFT:
+			runJoyStick = -1;
+			break;
+		default:
+			runJoyStick = 0;
+			break;
 	}
-	else{
-		error("Invalid number of entries. Try again");
+}
+
+void initGame(gamestate_t *game)
+{
+	game->ballx = game->bally = game->ballxprev = game->ballyprev = 5;
+}
+
+void drawPaddle(sense_fb_bitmap_t *screen, int startingPaddleIndex, uint16_t color)
+{
+	clearBitmap(fb->bitmap, getColor(0,0,0));
+
+	int i = startingPaddleIndex;
+	int count = 0; // Number of paddle dots 
+
+	while(i < 8 && i >= 0 && count < 3)
+	{
+		setPixel(screen, i, 0, color);
+		setPixel(screen, i, 1, color);
+		i++;
+		count++;
 	}
+}
 
+void drawBall(sense_fb_bitmap_t *screen, gamestate_t *state, uint16_t color)
+{
+	setPixel(screen, state->ballxprev, state->ballyprev, 0);
+	setPixel(screen, state->ballx, state->bally, color);
+}
 
-}	
+int  movePaddle(sense_fb_bitmap_t *screen, int direction)
+{
+	int paddleX = 0;
+	if(direction == 1)
+	{
+		paddleX += SPEED * direction;	
+	}
+	else if(direction == -1)
+	{
+		paddleX += SPEED * direction;
+	}
+	return paddleX;
+}
+
+int main(int argc, char* argv[])
+{
+	int cnt = 0, i, startingPaddleIndex = 0, paddleSpeed = 0;
+
+	pi_i2c_t *device;
+	coordinate_t data;
+
+	gamestate_t game;
+	initGame(&game);
+
+	signal(SIGINT, handler);
+
+	fb = getFBDevice();
+	pi_joystick_t* joystick = getJoystickDevice();
+
+	if(!fb)
+	{
+		return 0;
+	}
+	clearBitmap(fb->bitmap, 0);
+
+	drawPaddle(fb->bitmap,startingPaddleIndex, getColor(0,0,255));
+	drawBall(fb->bitmap, &game, getColor(255,0,0));
+
+	device = geti2cDevice();
+	if(device)
+	{
+		configureAccelGyro(device);
+		while(run)
+		{
+			usleep(2000);
+
+			while(run && getGyroPosition(device, &data))
+			{
+				drawBall(fb->bitmap, &game, getColor(255,0,0));
+			
+
+				pollJoystick(joystick, callbackFn, 0);
+				if(runJoyStick == 1 || runJoyStick == -1)
+				{
+					printf("\nJOYSTICK RUNNING");
+					startingPaddleIndex +=  movePaddle(fb->bitmap, runJoyStick);
+					printf("\n Paddle Speed: %d", startingPaddleIndex);
+					drawPaddle(fb->bitmap, startingPaddleIndex, getColor(0,0,255));
+					runJoyStick = 0;
+				}
+
+			}
+		}
+		freei2cDevice(device);
+	}
+	
+	clearBitmap(fb->bitmap, 0);
+	freeFrameBuffer(fb);
+	freeJoystick(joystick);
+	return 0;
+
+}
