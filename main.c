@@ -72,18 +72,35 @@ void drawBall(sense_fb_bitmap_t *screen, gamestate_t *state, uint16_t color)
 	setPixel(screen, state->ballxprev, state->ballyprev, 0);
 	setPixel(screen, state->ballx, state->bally, color);
 }
-
+//function to generate a random number from -3 to 3
+int generate_random(){
+	return (rand()%3)-3;
+}
+//Detects if the pixel reaches the paddles' x coordinates
+int collision_detection(){
+//FIXME need to edit and find x coordinates of paddle(whatever speed is being returned is actually either ths starting or ending x coor of the paddle
+}
 void moveBall(gamestate_t *state){
+	usleep(100000);
 	int x = state->ballx;
 	int y = state->bally;
 	state->ballxprev = state->ballx;
 	state->ballyprev = state->bally;
-	if(y>=8){
+	if(x>=7){
+		ballXVel = -1;
+	}
+	if(x<=0){
+		ballXVel = 1;
+	}
+	if(y>=7){
 		ballYVel=-1;
+		state->ballx+=generate_random();
 	}	
 	else if(y<=0){
 		ballYVel = 1;
+		state->ballx+=generate_random();
 	}
+	state->ballx +=ballXVel;
 	state->bally += ballYVel;
 
 }
