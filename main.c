@@ -48,7 +48,7 @@ void callbackFn(unsigned int code)
 
 void initGame(gamestate_t *game)
 {
-	game->ballx = game->bally = game->ballxprev = game->ballyprev = 0;
+	game->ballx = game->bally = game->ballxprev = game->ballyprev = 1;
 }
 
 void drawPaddle(sense_fb_bitmap_t *screen, int startingPaddleIndex, uint16_t color)
@@ -61,7 +61,6 @@ void drawPaddle(sense_fb_bitmap_t *screen, int startingPaddleIndex, uint16_t col
 	while(i < 8 && i >= 0 && count < 3)
 	{
 		setPixel(screen, i, 0, color);
-		setPixel(screen, i, 1, color);
 		i++;
 		count++;
 	}
@@ -69,19 +68,24 @@ void drawPaddle(sense_fb_bitmap_t *screen, int startingPaddleIndex, uint16_t col
 
 void drawBall(sense_fb_bitmap_t *screen, gamestate_t *state, uint16_t color)
 {     
-	setPixel(screen, state->ballxprev, state->ballyprev, 0);
+	setPixel(screen, state->ballxprev, state->ballyprev,0);
 	setPixel(screen, state->ballx, state->bally, color);
 }
 //function to generate a random number from -3 to 3
 int generate_random(){
 	return (rand()%3)-3;
 }
-//Detects if the pixel reaches the paddles' x coordinates
-int collision_detection(){
+//Detects if the pixel reaches the paddles' x coordinates, returns 1 if collision detected
+int collision(int paddle_xpos, int ball_xpos){
 //FIXME need to edit and find x coordinates of paddle(whatever speed is being returned is actually either ths starting or ending x coor of the paddle
+if(ball_xpos>=paddle_xpos&&ball_xpos<=(paddle_xpos+2)){
+	return 1;}
+else{
+	return 0;
 }
-void moveBall(gamestate_t *state){
-	usleep(100000);
+}
+void moveBall(gamestate_t *state,int paddle_x_start){
+	usleep(200000);
 	int x = state->ballx;
 	int y = state->bally;
 	state->ballxprev = state->ballx;
@@ -96,7 +100,7 @@ void moveBall(gamestate_t *state){
 		ballYVel=-1;
 		state->ballx+=generate_random();
 	}	
-	else if(y<=0){
+	else if(y<=1){
 		ballYVel = 1;
 		state->ballx+=generate_random();
 	}
@@ -141,7 +145,7 @@ int main(int argc, char* argv[])
 	clearBitmap(fb->bitmap, 0);
 
 	drawPaddle(fb->bitmap,startingPaddleIndex, getColor(0,0,255));
-	drawBall(fb->bitmap, &game, getColor(255,0,0));
+	drawBall(fb->bitmap, &game,getColor(255,0,0));
 	device = geti2cDevice();
 	if(device)
 	{
@@ -153,14 +157,14 @@ int main(int argc, char* argv[])
 			while(run && getGyroPosition(device, &data))
 			{
 				drawBall(fb->bitmap, &game, getColor(255,0,0));
-				moveBall(&game);
+				moveBall(&game,startingPaddleIndex);
 
 				pollJoystick(joystick, callbackFn, 0);
 				if(runJoyStick == 1 || runJoyStick == -1)
 				{
 					printf("\nJOYSTICK RUNNING");
 					startingPaddleIndex +=  movePaddle(fb->bitmap, runJoyStick);
-					printf("\n Paddle Speed: %d", startingPaddleIndex);
+					printf("\n Paddle Starting X-Pos: %d", startingPaddleIndex);
 					drawPaddle(fb->bitmap, startingPaddleIndex, getColor(0,0,255));
 					runJoyStick = 0;
 				}
