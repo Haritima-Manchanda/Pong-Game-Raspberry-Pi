@@ -75,17 +75,18 @@ void drawBall(sense_fb_bitmap_t *screen, gamestate_t *state, uint16_t color)
 int generate_random(){
 	return (rand()%3)-3;
 }
-//Detects if the pixel reaches the paddles' x coordinates, returns 1 if collision detected
+//Detects if the pixel reaches the paddles' x coordinates, returns 1 if collision detected to be used together with
+//y in moveBall
 int collision(int paddle_xpos, int ball_xpos){
-//FIXME need to edit and find x coordinates of paddle(whatever speed is being returned is actually either ths starting or ending x coor of the paddle
+//FIXME if both x coors are the same, 
 if(ball_xpos>=paddle_xpos&&ball_xpos<=(paddle_xpos+2)){
 	return 1;}
 else{
 	return 0;
 }
 }
-void moveBall(gamestate_t *state,int paddle_x_start){
-	usleep(200000);
+void moveBall(gamestate_t *state,int paddle_x){
+
 	int x = state->ballx;
 	int y = state->bally;
 	state->ballxprev = state->ballx;
@@ -106,7 +107,7 @@ void moveBall(gamestate_t *state,int paddle_x_start){
 	}
 	state->ballx +=ballXVel;
 	state->bally += ballYVel;
-
+	usleep(200000);
 }
 
 int  movePaddle(sense_fb_bitmap_t *screen, int direction)
