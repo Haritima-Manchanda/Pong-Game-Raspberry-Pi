@@ -101,10 +101,12 @@ void moveBall(gamestate_t *state,int paddle_x){
 		ballYVel=-1;
 		state->ballx+=generate_random();
 	}	
-	else if(y<=1){
+	else if(y<=1&&collision(paddle_x,x)){
 		ballYVel = 1;
 		state->ballx+=generate_random();
 	}
+	else if(y<=1&&(collision(paddle_x,x)==0)){
+		run = 0;}
 	state->ballx +=ballXVel;
 	state->bally += ballYVel;
 	usleep(200000);
