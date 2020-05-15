@@ -14,6 +14,8 @@ int runJoyStick = 0; // Keeps account of whether joystick is running and also th
 
 pi_framebuffer_t *fb;
 
+	int ballXVel;
+	int ballYVel;
 typedef struct
 {
 	int ballx;
@@ -46,7 +48,7 @@ void callbackFn(unsigned int code)
 
 void initGame(gamestate_t *game)
 {
-	game->ballx = game->bally = game->ballxprev = game->ballyprev = 5;
+	game->ballx = game->bally = game->ballxprev = game->ballyprev = 0;
 }
 
 void drawPaddle(sense_fb_bitmap_t *screen, int startingPaddleIndex, uint16_t color)
@@ -66,9 +68,24 @@ void drawPaddle(sense_fb_bitmap_t *screen, int startingPaddleIndex, uint16_t col
 }
 
 void drawBall(sense_fb_bitmap_t *screen, gamestate_t *state, uint16_t color)
-{
+{     
 	setPixel(screen, state->ballxprev, state->ballyprev, 0);
 	setPixel(screen, state->ballx, state->bally, color);
+}
+
+void moveBall(gamestate_t *state){
+	int x = state->ballx;
+	int y = state->bally;
+	state->ballxprev = state->ballx;
+	state->ballyprev = state->bally;
+	if(y>=8){
+		ballYVel=-1;
+	}	
+	else if(y<=0){
+		ballYVel = 1;
+	}
+	state->bally += ballYVel;
+
 }
 
 int  movePaddle(sense_fb_bitmap_t *screen, int direction)
@@ -108,7 +125,6 @@ int main(int argc, char* argv[])
 
 	drawPaddle(fb->bitmap,startingPaddleIndex, getColor(0,0,255));
 	drawBall(fb->bitmap, &game, getColor(255,0,0));
-
 	device = geti2cDevice();
 	if(device)
 	{
@@ -120,7 +136,7 @@ int main(int argc, char* argv[])
 			while(run && getGyroPosition(device, &data))
 			{
 				drawBall(fb->bitmap, &game, getColor(255,0,0));
-			
+				moveBall(&game);
 
 				pollJoystick(joystick, callbackFn, 0);
 				if(runJoyStick == 1 || runJoyStick == -1)
