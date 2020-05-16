@@ -135,6 +135,44 @@ void runAsServer(int portno)
 	close(sockfd);
 }
 
+void run_as_client(int portno, char* IP_addr){
+	int sockfd, n;
+	struct sockaddr_in serv_addr;
+	struct hostent *server;
+	char buffer[256];
+	char newbuffer[1024];
+	sockfd = socketCreate();
+	if(sockfd<0){
+		error("Error opening socket");
+	}
+	server = gethostbyname(IP_addr);
+	if(server==NULL){
+		fprintf(stderr, "ERROR, no such host\n");
+		exit(0);}
+	bzero((char*)&serv_addr,sizeof(serv_addr));
+	serv_addr.sin_family = AF_INET;
+	bcopy((char*)server->h_addr,(char*)&serv_addr.sin_addr.s_addr,
+				server->h_length);
+	serv_addr.sin_port = htons(portno);
+	if(connect(sockfd,(struct sockaddr *)&serv_addr,sizeof(serv_addr))<0)
+		error("ERROR reading from socket");
+	printf("PLEASE ENTER MESSAGE");
+	bzero(buffer,256);
+	fgets(buffer, 255, stdin);//FIXME not stdin
+	strcpy(buffer,"GET \r\n\n\n");
+	strcat(buffer, IP_addr);
+	n = send(sockfd,buffer,strlen(buffer),0);
+	if(n<0)
+		error("ERROR reading from socket");
+	printf("%s\n", buffer);
+	printf("The n value is %d\n", n);
+	n = recv(sockfd,newbuffer,sizeof(newbuffer),0);
+	if(n<0)
+		error("ERROR reading from socket");
+	printf("%s\n", newbuffer);
+	close(sockfd);
+}
+
 void callbackFn(unsigned int code)
 {
 	switch(code)
@@ -171,6 +209,7 @@ void drawPaddle(sense_fb_bitmap_t *screen, int startingPaddleIndex, uint16_t col
 	}
 }
 
+
 void drawBall(sense_fb_bitmap_t *screen, gamestate_t *state, uint16_t color)
 {     
 	setPixel(screen, state->ballxprev, state->ballyprev,0);
@@ -187,7 +226,6 @@ int generate_random()
 //y in moveBall
 int collision(int paddle_xpos, int ball_xpos)
 {
-//FIXME if both x coors are the same,
  
 	if(ball_xpos >= paddle_xpos && ball_xpos <= (paddle_xpos + 2))
 	{
@@ -288,6 +326,7 @@ int main(int argc, char* argv[])
 	{
 		printf("\n Initializing as client...");
 		//FIXME put statements for porno and server name.
+		portno =atoi(argv[1]);
 	}
 	else
 	{
