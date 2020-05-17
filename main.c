@@ -55,6 +55,27 @@ void error(char *msg)
 	exit(0);
 }
 
+char* ballPositionSent(gamestate_t *state, int paddle_x)
+{
+	int x = state->ballx;
+	int y = state->bally;
+
+	static char data[MAX]; // It is not a good idea to return the address of a local variable outside the function,
+       			      //so we would have to define the local variable as static. 
+
+	if(y == 7)// && (collision(paddle_x, x) == 1))
+	{	
+		strcat(data,(char*)x);
+		strcat(data,(char*)y);
+		return data;
+	}
+	else
+	{
+		return NULL;
+	}
+
+}
+
 int socketCreate()
 {
 	int server_socket;
@@ -119,7 +140,8 @@ int  runAsServer(int portno)
 
 	printf("Here is the message: %s\n", buffer);
 
-	n = send(newsockfd, "I got your message", 18, 0);
+	strcpy(buffer, ballPositionSent(gamestate_t *state, startingPaddleIndex));
+	n = send(newsockfd,buffer,strlen(buffer), 0);
 	if(n < 0)
 	{
 		error("Error writing to socket");
@@ -306,26 +328,6 @@ int  movePaddle(sense_fb_bitmap_t *screen, int direction)
 }
 
 //ballPositionSent(): return the ball's position as data when it reaches the end of the screen.
-char* ballPositionSent(gamestate_t *state, int paddle_x)
-{
-	int x = state->ballx;
-	int y = state->bally;
-
-	static char data[MAX]; // It is not a good idea to return the address of a local variable outside the function,
-       			      //so we would have to define the local variable as static. 
-
-	if(x == 7 && (collision(paddle_x, x) == 1))
-	{	
-		strcat(data,(char*)x);
-		strcat(data,(char*)y);
-		return data;
-	}
-	else
-	{
-		return NULL;
-	}
-
-}
 
 int main(int argc, char* argv[])
 {
