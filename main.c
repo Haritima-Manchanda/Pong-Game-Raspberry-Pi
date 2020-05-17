@@ -25,7 +25,8 @@ int run = 1;
 int score = 0;
 int runJoyStick = 0;
 int startingPaddleIndex = 0;
-
+int serverRunning = 0;
+int clientRunning = 0;
 
 pi_framebuffer_t *fb;
 
@@ -120,11 +121,13 @@ int  runAsServer(int portno)
 		error("Error Bind Failed");
 	}
 	
-	listen(sockfd, 5);
+	listen(sockfd, 10);
 	clilen = sizeof(cli_addr);
+
+	
+	
 	newsockfd = accept(sockfd, (struct sockaddr*)&cli_addr, &clilen);
 
-	printf("\nNewSocket Created");
 	if(newsockfd < 0)
 	{
 		error("Error in Accepting");
@@ -132,16 +135,21 @@ int  runAsServer(int portno)
 
 	bzero(buffer, 256);
 
-	n = recv(newsockfd, buffer,255, 0);
-	if(n < 0)
+	while(1)
 	{
-		error("Error reading from socket");
+
+		n = recv(newsockfd, buffer, 255, MSG_DONTWAIT);	
+
+		if(n > 0)
+		{
+			break;
+		}
+	
 	}
 
 	printf("Here is the message: %s\n", buffer);
 
-	strcpy(buffer, ballPositionSent(gamestate_t *state, startingPaddleIndex));
-	n = send(newsockfd,buffer,strlen(buffer), 0);
+	n = send(newsockfd, "I got your message", 18, 0);
 	if(n < 0)
 	{
 		error("Error writing to socket");
@@ -196,14 +204,17 @@ int runAsClient(int portno, char* IP_addr)
 	{
 		error("ERROR writing to socket");
 	}
+
 	bzero(buffer, 4096);
-
-	n = recv(sockfd,buffer ,sizeof(buffer),0);
-	if(n<0 || strlen(buffer) > 4096)
+	while(1)
 	{
-		error("ERROR reading from socket");
+		n = recv(sockfd,buffer ,sizeof(buffer),MSG_DONTWAIT);
+		
+		if(n > 0)
+		{
+			break;
+		}
 	}
-
 	printf("%s\n", buffer);
 	close(sockfd);
 
@@ -292,7 +303,7 @@ void moveBall(gamestate_t *state, int paddle_x)
 	{
 		ballXVel = 1;
 	}
-	if(y >= 7)
+	if(y >= 6)
 	{
 		ballYVel=-1;
 		state->ballx+=generate_random();
@@ -333,7 +344,6 @@ int main(int argc, char* argv[])
 {
 	int portno, i;
 	int paddleSpeed = 0;
-	int serverRunning = 0, clientRunning = 0;
 
 	if(argc == 2)
 	{
