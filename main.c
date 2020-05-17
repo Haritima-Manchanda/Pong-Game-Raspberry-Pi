@@ -41,6 +41,7 @@ typedef struct
 }gamestate_t;
 
 // handler() : Exits the program on ctrl C
+
 void handler(int sig){
 	printf("\nEXITING...\n");
 	run = 0;
@@ -57,7 +58,7 @@ void error(char *msg)
 int socketCreate()
 {
 	int server_socket;
-	printf("Create the socket\n");
+	printf("\nCreate the socket\n");
 
 	server_socket = socket(AF_INET, SOCK_STREAM, 0);
 	return server_socket;
@@ -75,11 +76,10 @@ int bindCreatedSocket(int server_socket, int portno)
 	serv_addr.sin_port = htons(portno);
 
 	n = bind(server_socket, (struct sockaddr*)&serv_addr, sizeof(serv_addr));
-
 	return n;
 }
 
-void runAsServer(int portno)
+int  runAsServer(int portno)
 {
 	int sockfd, newsockfd, clilen;
 	char buffer[256];
@@ -88,22 +88,17 @@ void runAsServer(int portno)
 	struct sockaddr_in serv_addr, cli_addr;
 	int n;
 
-	//CREATE SOCKET
 	sockfd = socketCreate();
 	if(sockfd < 0)
 	{
 		error("Error in Creating Socket");
 	}
-	printf("\nSocket Created");
 
-	//BIND
-	if(bindCreatedSocket(sockfd, portno) < 0)
+	if(bindCreatedSocket(sockfd,portno) < 0)
 	{
 		error("Error Bind Failed");
 	}
-	printf("\nBind Done");
-
-	//LISTEN
+	
 	listen(sockfd, 5);
 	clilen = sizeof(cli_addr);
 	newsockfd = accept(sockfd, (struct sockaddr*)&cli_addr, &clilen);
@@ -133,44 +128,70 @@ void runAsServer(int portno)
 	printf("\nMessage Sent");
 	close(newsockfd);
 	close(sockfd);
+
+	return 1;
 }
 
-void run_as_client(int portno, char* IP_addr){
+int runAsClient(int portno, char* IP_addr)
+{
 	int sockfd, n;
 	struct sockaddr_in serv_addr;
 	struct hostent *server;
+
 	char buffer[256];
 	char newbuffer[1024];
+
 	sockfd = socketCreate();
-	if(sockfd<0){
+
+	if(sockfd<0)
+	{
 		error("Error opening socket");
 	}
+
 	server = gethostbyname(IP_addr);
-	if(server==NULL){
+	if(server==NULL)
+	{
 		fprintf(stderr, "ERROR, no such host\n");
-		exit(0);}
+		exit(0);
+	}
+
 	bzero((char*)&serv_addr,sizeof(serv_addr));
+
 	serv_addr.sin_family = AF_INET;
-	bcopy((char*)server->h_addr,(char*)&serv_addr.sin_addr.s_addr,
-				server->h_length);
+	bcopy((char*)server->h_addr,(char*)&serv_addr.sin_addr.s_addr,server->h_length);
 	serv_addr.sin_port = htons(portno);
+
 	if(connect(sockfd,(struct sockaddr *)&serv_addr,sizeof(serv_addr))<0)
+	{
 		error("ERROR reading from socket");
+	}
+
 	printf("PLEASE ENTER MESSAGE");
+
 	bzero(buffer,256);
 	fgets(buffer, 255, stdin);//FIXME not stdin
 	strcpy(buffer,"GET \r\n\n\n");
 	strcat(buffer, IP_addr);
+
 	n = send(sockfd,buffer,strlen(buffer),0);
 	if(n<0)
+	{
 		error("ERROR reading from socket");
+	}
+
 	printf("%s\n", buffer);
 	printf("The n value is %d\n", n);
+
 	n = recv(sockfd,newbuffer,sizeof(newbuffer),0);
 	if(n<0)
+	{
 		error("ERROR reading from socket");
+	}
+
 	printf("%s\n", newbuffer);
 	close(sockfd);
+
+	return 1;
 }
 
 void callbackFn(unsigned int code)
@@ -320,69 +341,73 @@ int main(int argc, char* argv[])
 	{
 		printf("\n Initializing as Server...");
 		portno = atoi(argv[1]);
-		runAsServer(portno);
 	}
+	
 	else if(argc == 3)
 	{
 		printf("\n Initializing as client...");
-		//FIXME put statements for porno and server name.
-		portno =atoi(argv[1]);
+		portno = atoi(argv[1]);
 	}
 	else
 	{
 		error("\nWrong number of arguments provided...");
 	}
 
-	pi_i2c_t *device;
-	coordinate_t data;
-
-	gamestate_t game;
-	initGame(&game);
-
-	signal(SIGINT, handler);
-
-	fb = getFBDevice();
-	pi_joystick_t* joystick = getJoystickDevice();
-
-	if(!fb)
+	if(runAsServer(portno) == 1 || runAsClient(portno, argv[2] == 1))
 	{
-		return 0;
-	}
-	clearBitmap(fb->bitmap, 0);
+		pi_i2c_t *device;
+		coordinate_t data;
 
-	drawPaddle(fb->bitmap,startingPaddleIndex, getColor(0,0,255));
-	drawBall(fb->bitmap, &game,getColor(255,0,0));
-	device = geti2cDevice();
-	if(device)
-	{
-		configureAccelGyro(device);
-		while(run)
+		gamestate_t game;
+		initGame(&game);
+
+		signal(SIGINT, handler);
+
+		fb = getFBDevice();
+		pi_joystick_t* joystick = getJoystickDevice();
+
+		if(!fb)
 		{
-			usleep(2000);
+			return 0;
+		}
 
+		clearBitmap(fb->bitmap, 0);
+
+		drawPaddle(fb->bitmap,startingPaddleIndex, getColor(0,0,255));
+		drawBall(fb->bitmap, &game,getColor(255,0,0));
+
+		device = geti2cDevice();
+
+		if(device)
+		{
+			configureAccelGyro(device);
 			while(run)
 			{
-				drawBall(fb->bitmap, &game, getColor(255,0,0));
-				moveBall(&game,startingPaddleIndex);
+				usleep(2000);
 
-				pollJoystick(joystick, callbackFn, 0);
-				if(runJoyStick == 1 || runJoyStick == -1)
+				while(run)
 				{
-					printf("\nJOYSTICK RUNNING");
-					startingPaddleIndex +=  movePaddle(fb->bitmap, runJoyStick);
-					printf("\n Paddle Starting X-Pos: %d", startingPaddleIndex);
-					drawPaddle(fb->bitmap, startingPaddleIndex, getColor(0,0,255));
-					runJoyStick = 0;
-				}
+					drawBall(fb->bitmap, &game, getColor(255,0,0));
+					moveBall(&game,startingPaddleIndex);
 
+					pollJoystick(joystick, callbackFn, 0);
+					if(runJoyStick == 1 || runJoyStick == -1)
+					{
+						printf("\nJOYSTICK RUNNING");
+						startingPaddleIndex +=  movePaddle(fb->bitmap, runJoyStick);
+						printf("\n Paddle Starting X-Pos: %d", startingPaddleIndex);
+						drawPaddle(fb->bitmap, startingPaddleIndex, getColor(0,0,255));
+						runJoyStick = 0;
+					}
+
+				}
 			}
+			freei2cDevice(device);
 		}
-		freei2cDevice(device);
-	}
 	
-	clearBitmap(fb->bitmap, 0);
-	freeFrameBuffer(fb);
-	freeJoystick(joystick);
-	return 0;
+		clearBitmap(fb->bitmap, 0);
+		freeFrameBuffer(fb);
+		freeJoystick(joystick);}
+		return 0;
 
 }
