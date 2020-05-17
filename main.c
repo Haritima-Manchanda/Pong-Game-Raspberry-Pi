@@ -138,8 +138,7 @@ int runAsClient(int portno, char* IP_addr)
 	struct sockaddr_in serv_addr;
 	struct hostent *server;
 
-	char buffer[256];
-	char newbuffer[1024];
+	char buffer[4096];
 
 	sockfd = socketCreate();
 
@@ -149,50 +148,46 @@ int runAsClient(int portno, char* IP_addr)
 	}
 
 	server = gethostbyname(IP_addr);
-	if(server==NULL)
+	
+	if(server == NULL)
 	{
 		fprintf(stderr, "ERROR, no such host\n");
 		exit(0);
 	}
 
 	bzero((char*)&serv_addr,sizeof(serv_addr));
-
 	serv_addr.sin_family = AF_INET;
+
 	bcopy((char*)server->h_addr,(char*)&serv_addr.sin_addr.s_addr,server->h_length);
 	serv_addr.sin_port = htons(portno);
 
 	if(connect(sockfd,(struct sockaddr *)&serv_addr,sizeof(serv_addr))<0)
 	{
-		error("ERROR reading from socket");
+		error("ERROR connecting");
 	}
 
-	printf("PLEASE ENTER MESSAGE");
-
-	bzero(buffer,256);
-	fgets(buffer, 255, stdin);//FIXME not stdin
-	strcpy(buffer,"GET \r\n\n\n");
+	strcpy(buffer, "GET /\r\n\r\n");
 	strcat(buffer, IP_addr);
 
 	n = send(sockfd,buffer,strlen(buffer),0);
 	if(n<0)
 	{
-		error("ERROR reading from socket");
+		error("ERROR writing to socket");
 	}
+	bzero(buffer, 4096);
 
-	printf("%s\n", buffer);
-	printf("The n value is %d\n", n);
-
-	n = recv(sockfd,newbuffer,sizeof(newbuffer),0);
-	if(n<0)
+	n = recv(sockfd,buffer ,sizeof(buffer),0);
+	if(n<0 || strlen(buffer) > 4096)
 	{
 		error("ERROR reading from socket");
 	}
 
-	printf("%s\n", newbuffer);
+	printf("%s\n", buffer);
 	close(sockfd);
 
 	return 1;
 }
+
 
 void callbackFn(unsigned int code)
 {
@@ -336,24 +331,27 @@ int main(int argc, char* argv[])
 {
 	int portno, i;
 	int paddleSpeed = 0;
+	int serverRunning = 0, clientRunning = 0;
 
 	if(argc == 2)
 	{
 		printf("\n Initializing as Server...");
 		portno = atoi(argv[1]);
+		serverRunning = runAsServer(portno);
 	}
 	
 	else if(argc == 3)
 	{
 		printf("\n Initializing as client...");
 		portno = atoi(argv[1]);
+		clientRunning = runAsClient(portno, argv[2]);
 	}
 	else
 	{
 		error("\nWrong number of arguments provided...");
 	}
 
-	if(runAsServer(portno) == 1 || runAsClient(portno, argv[2] == 1))
+	if(serverRunning == 1 || clientRunning == 1)
 	{
 		pi_i2c_t *device;
 		coordinate_t data;
