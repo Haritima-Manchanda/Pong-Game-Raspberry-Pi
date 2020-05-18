@@ -14,15 +14,17 @@
 
 // SPEED: the speed of the paddle with which it moves when joystick is pressed either left or right. 
 #define SPEED 1
-#define MAX 5
-
+#define MAX 4096
+int  initializeGameSetUp();
 
 //GLOBAL VARIABLES
 //run: Keeps account of whether the program is running.
 //score: Keeps account of score of each team.
 //runJoyStick: Keeps account of whether the joystick is presses and also the direction (left or right) in which it is pressed.
+//serverRunning: Keeps account of whether server is running
+//clientRunning: Keeps account of whether client is running
 int run = 1; 
-int score = 0;
+int scorePlayer = 0;
 int runJoyStick = 0;
 int startingPaddleIndex = 0;
 int serverRunning = 0;
@@ -30,9 +32,11 @@ int clientRunning = 0;
 
 pi_framebuffer_t *fb;
 
+//ballXVel and ballYVel : Used to change direction of ball 
 int ballXVel;
 int ballYVel;
 
+//structure to contain the coordinates of ball
 typedef struct
 {
 	int ballx;
@@ -42,8 +46,8 @@ typedef struct
 }gamestate_t;
 
 // handler() : Exits the program on ctrl C
-
-void handler(int sig){
+void handler(int sig)
+{
 	printf("\nEXITING...\n");
 	run = 0;
 }
@@ -56,21 +60,7 @@ void error(char *msg)
 	exit(0);
 }
 
-char* ballPositionSent(gamestate_t *state, int paddle_x)
-{
-	int x = state->ballx;
-	int y = state->bally;
-
-	static char data[MAX]; // It is not a good idea to return the address of a local variable outside the function,
-       			      //so we would have to define the local variable as static. 
-	
-	data[0] = x;
-	data[1] = y;
-
-	return data;
-
-}
-
+//socketCreate(): Creates the socket and returns the value of socket descriptor
 int socketCreate()
 {
 	int server_socket;
@@ -78,9 +68,9 @@ int socketCreate()
 
 	server_socket = socket(AF_INET, SOCK_STREAM, 0);
 	return server_socket;
-
 }
 
+//Used by the server side to bind
 int bindCreatedSocket(int server_socket, int portno)
 {
 	int n = -1;
@@ -95,6 +85,7 @@ int bindCreatedSocket(int server_socket, int portno)
 	return n;
 }
 
+//function to run as server if only 2 arguments are passed
 int  runAsServer(int portno)
 {
 	int sockfd, newsockfd, clilen;
@@ -115,54 +106,63 @@ int  runAsServer(int portno)
 		error("Error Bind Failed");
 	}
 	
+	
 	listen(sockfd, 10);
 	clilen = sizeof(cli_addr);
 
-	
-	newsockfd = accept(sockfd, (struct sockaddr*)&cli_addr, &clilen);
+	int data = initializeGameSetUp();
 
-	if(newsockfd < 0)
+	if(data != 0)
 	{
-		error("Error in Accepting");
-	}
+		newsockfd = accept(sockfd, (struct sockaddr*)&cli_addr, &clilen);
 
-	bzero(buffer, 256);
-
-	while(1)
-	{
-
-		n = recv(newsockfd, buffer, 255, MSG_DONTWAIT);	
-
-		if(n > 0)
+		if(newsockfd < 0)
 		{
-			break;
+			error("Error in Accepting");
 		}
+
+		bzero(buffer, 256);
+
+		while(1)
+		{
+
+			n = recv(newsockfd, buffer, 255, MSG_DONTWAIT);	
+
+			if(n > 0)
+			{
+				break;
+			}
 	
+		}
+
+		printf("Here is the message: %s\n", buffer);
+
+		newBuffer[0] = data;		//When the ball reaches the end of screen, data has the X coordinate of the ball
+		newBuffer[1] = 7;		// When the ball reaches the end of scree, the Y coordinate is 7
+		newBuffer[2] = scorePlayer;	//score of the player
+
+		n = send(newsockfd, newBuffer, strlen(newBuffer), 0);
+		if(n < 0)
+		{
+			error("Error writing to socket");
+		}
+
+		printf("\nMessage Sent %s\n", newBuffer);
 	}
-
-	printf("Here is the message: %s\n", buffer);
-
-
-	n = send(newsockfd, "I got your message", 18, 0);
-	if(n < 0)
-	{
-		error("Error writing to socket");
-	}
-
-	printf("\nMessage Sent");
 	close(newsockfd);
 	close(sockfd);
 
 	return 1;
 }
 
+//function to run as client if 3 arguments are passed
 int runAsClient(int portno, char* IP_addr)
 {
 	int sockfd, n;
 	struct sockaddr_in serv_addr;
 	struct hostent *server;
 
-	char buffer[4096];
+	char buffer[MAX];
 
 	sockfd = socketCreate();
 
@@ -190,33 +190,46 @@ int runAsClient(int portno, char* IP_addr)
 		error("ERROR connecting");
 	}
 
-	strcpy(buffer, "GET/\r\n\r\n");
-	strcat(buffer, IP_addr);
-	n = send(sockfd,buffer,strlen(buffer),0);
-	if(n<0)
-	{
-		error("ERROR writing to socket");
-	}
+	int data = initializeGameSetUp();
 
-	bzero(buffer, 4096);
-
-	while(1)
+	if(data != 0)
 	{
-		n = recv(sockfd,buffer ,sizeof(buffer),MSG_DONTWAIT);
-		
-		if(n > 0)
+		//The two statements below is to check whether the client side runs using the GET request from browser.
+	//	strcpy(buffer, "GET/\r\n\r\n");
+	//	strcat(buffer, IP_addr);
+	
+		buffer[0] = data;		// When the ball reaches the end of screen the value stored in data is the X coordinate
+		buffer[1] = 7; 			// When the ball reaches the end of screen the Y coordinate is 7
+		buffer[3] = scorePlayer;	// Sends the score
+
+		n = send(sockfd,buffer,strlen(buffer),0);
+		if(n<0)
 		{
-			break;
+			error("ERROR writing to socket");
 		}
+
+		bzero(buffer,4096);
+
+		while(1)
+		{
+			n = recv(sockfd,buffer ,sizeof(buffer),MSG_DONTWAIT);
+		
+			if(n > 0)
+			{
+				break;
+			}
+		}
+
+		printf("%s\n", buffer);
 	}
 
-	printf("%s\n", buffer);
 	close(sockfd);
 
 	return 1;
 }
 
-
+//Keeps account of event.
+//Event occurs when the joystick is pressed
 void callbackFn(unsigned int code)
 {
 	switch(code)
@@ -233,10 +246,12 @@ void callbackFn(unsigned int code)
 	}
 }
 
+//Sets up Initial Position of the ball
 void initGame(gamestate_t *game)
 {
 	game->ballx = game->bally = game->ballxprev = game->ballyprev = 1;
 }
+
 
 void drawPaddle(sense_fb_bitmap_t *screen, int startingPaddleIndex, uint16_t color)
 {
@@ -253,26 +268,25 @@ void drawPaddle(sense_fb_bitmap_t *screen, int startingPaddleIndex, uint16_t col
 	}
 }
 
-
 void drawBall(sense_fb_bitmap_t *screen, gamestate_t *state, uint16_t color)
 {     
 	setPixel(screen, state->ballxprev, state->ballyprev,0);
 	setPixel(screen, state->ballx, state->bally, color);
 }
 
-//function to generate a random number from -3 to 3
+//Function to generate random movement of the ball
 int generate_random()
 {
 	return (rand() % 3) - 3;
 }
 
-//Detects if the pixel reaches the paddles' x coordinates, returns 1 if collision detected to be used together with
-//y in moveBall
+//Detects collision with paddle
 int collision(int paddle_xpos, int ball_xpos)
 {
  
 	if(ball_xpos >= paddle_xpos && ball_xpos <= (paddle_xpos + 2))
 	{
+		scorePlayer++;
 		return 1;
 	}
 	else
@@ -281,7 +295,7 @@ int collision(int paddle_xpos, int ball_xpos)
 	}
 }
 
-void moveBall(sense_fb_bitmap_t *screen, gamestate_t *state, int paddle_x)
+int  moveBall(sense_fb_bitmap_t *screen, gamestate_t *state, int paddle_x)
 {
 
 	int x = state->ballx;
@@ -300,11 +314,10 @@ void moveBall(sense_fb_bitmap_t *screen, gamestate_t *state, int paddle_x)
 		ballXVel = 1;
 	}
 
-	if(y >= 7)
+	if(y == 7)
 	{
-		char data[MAX];
-		clearBitmap(fb->bitmap, 0);
-		strcpy(data,  ballPositionSent(state, paddle_x));
+		clearBitmap(fb->bitmap, 0); // Clears the screen when the ball leaves the player's side
+		return x;		    
 	}
 
 	else if(y <= 1 && collision(paddle_x,x))
@@ -315,13 +328,15 @@ void moveBall(sense_fb_bitmap_t *screen, gamestate_t *state, int paddle_x)
 
 	else if(y <= 1 && (collision(paddle_x,x) == 0))
 	{
-		run = 0;
+		run = 0; // If the player misses the ball, the game ends
 	}
 
 	state->ballx += ballXVel;
 	state->bally += ballYVel;
 
-	usleep(200000);
+	usleep(200000); // Used to reduce the speed of the ball
+
+	return 0;
 }
 
 int  movePaddle(sense_fb_bitmap_t *screen, int direction)
@@ -338,7 +353,6 @@ int  movePaddle(sense_fb_bitmap_t *screen, int direction)
 	return paddleX;
 }
 
-//ballPositionSent(): return the ball's position as data when it reaches the end of the screen.
 
 int main(int argc, char* argv[])
 {
@@ -362,61 +376,69 @@ int main(int argc, char* argv[])
 	{
 		error("\nWrong number of arguments provided...");
 	}
+	return 0;
+}
 
-	if((serverRunning == 1 && clientRunning == 0) || (clientRunning == 1 && serverRunning == 0))
+int initializeGameSetUp()
+{
+
+	pi_i2c_t *device;
+	coordinate_t data;
+
+	gamestate_t game;
+	initGame(&game);
+
+	signal(SIGINT, handler);
+
+	fb = getFBDevice();
+	pi_joystick_t* joystick = getJoystickDevice();
+
+	if(!fb)
 	{
-		pi_i2c_t *device;
-		coordinate_t data;
+		return 0;
+	}
 
-		gamestate_t game;
-		initGame(&game);
+	clearBitmap(fb->bitmap, 0);
 
-		signal(SIGINT, handler);
+	drawPaddle(fb->bitmap,startingPaddleIndex, getColor(0,0,255));
+	drawBall(fb->bitmap, &game,getColor(255,0,0));
 
-		fb = getFBDevice();
-		pi_joystick_t* joystick = getJoystickDevice();
+	device = geti2cDevice();
 
-		if(!fb)
+	if(device)
+	{
+		while(run)
 		{
-			return 0;
-		}
+			usleep(2000);
 
-		clearBitmap(fb->bitmap, 0);
-
-		drawPaddle(fb->bitmap,startingPaddleIndex, getColor(0,0,255));
-		drawBall(fb->bitmap, &game,getColor(255,0,0));
-
-		device = geti2cDevice();
-
-		if(device)
-		{
 			while(run)
 			{
-				usleep(2000);
+				drawBall(fb->bitmap, &game, getColor(255,0,0));
 
-				while(run)
+				int data = moveBall(fb->bitmap, &game, startingPaddleIndex);
+				if(data != 0)
 				{
-					drawBall(fb->bitmap, &game, getColor(255,0,0));
-					moveBall(fb->bitmap, &game,startingPaddleIndex);
-
-					pollJoystick(joystick, callbackFn, 0);
-					if(runJoyStick == 1 || runJoyStick == -1)
-					{
-						printf("\nJOYSTICK RUNNING");
-						startingPaddleIndex +=  movePaddle(fb->bitmap, runJoyStick);
-						printf("\n Paddle Starting X-Pos: %d", startingPaddleIndex);
-						drawPaddle(fb->bitmap, startingPaddleIndex, getColor(0,0,255));
-						runJoyStick = 0;
-					}
-
+					return data;
 				}
+
+				pollJoystick(joystick, callbackFn, 0);
+				if(runJoyStick == 1 || runJoyStick == -1)
+				{
+					printf("\nJOYSTICK RUNNING");
+					startingPaddleIndex +=  movePaddle(fb->bitmap, runJoyStick);
+					printf("\n Paddle Starting X-Pos: %d", startingPaddleIndex);
+					drawPaddle(fb->bitmap, startingPaddleIndex, getColor(0,0,255));
+					runJoyStick = 0;
+				}
+
 			}
-			freei2cDevice(device);
 		}
+		freei2cDevice(device);
+	}
 	
-		clearBitmap(fb->bitmap, 0);
-		freeFrameBuffer(fb);
-		freeJoystick(joystick);}
-		return 0;
+	clearBitmap(fb->bitmap, 0);
+	freeFrameBuffer(fb);
+	freeJoystick(joystick);
+	return 0;
 
 }
