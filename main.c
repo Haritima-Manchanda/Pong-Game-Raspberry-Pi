@@ -11,17 +11,10 @@
 #include <netinet/in.h>
 #include <netdb.h>
 
-
-// SPEED: the speed of the paddle with which it moves when joystick is pressed either left or right. 
 #define SPEED 1
-#define MAX 4096
+#define MAX 5
 
-//GLOBAL VARIABLES
-//run: Keeps account of whether the program is running.
-//score: Keeps account of score of each team.
-//runJoyStick: Keeps account of whether the joystick is presses and also the direction (left or right) in which it is pressed.
-//serverRunning: Keeps account of whether server is running
-//clientRunning: Keeps account of whether client is running
+
 int run = 1; 
 int scorePlayer = 0;
 int runJoyStick = 0;
@@ -29,13 +22,14 @@ int startingPaddleIndex = 0;
 int serverRunning = 0;
 int clientRunning = 0;
 
+
 pi_framebuffer_t *fb;
 
-//ballXVel and ballYVel : Used to change direction of ball 
+
 int ballXVel;
 int ballYVel;
 
-//structure to contain the coordinates of ball
+
 typedef struct
 {
 	int ballx;
@@ -44,24 +38,24 @@ typedef struct
 	int ballyprev;
 }gamestate_t;
 
+
 int initializeGameSetUp(gamestate_t *state);
 void initGame(gamestate_t *state);
-// handler() : Exits the program on ctrl C
+
+
 void handler(int sig)
 {
 	printf("\nEXITING...\n");
 	run = 0;
 }
 
-// error(): sends an error with the message passed during function call.
-// 	    exits the program.
+
 void error(char *msg)
 {
 	perror(msg);
 	exit(0);
 }
 
-//socketCreate(): Creates the socket and returns the value of socket descriptor
 int socketCreate()
 {
 	int server_socket;
@@ -71,7 +65,6 @@ int socketCreate()
 	return server_socket;
 }
 
-//Used by the server side to bind
 int bindCreatedSocket(int server_socket, int portno)
 {
 	int n = -1;
@@ -86,12 +79,12 @@ int bindCreatedSocket(int server_socket, int portno)
 	return n;
 }
 
-//function to run as server if only 2 arguments are passed
+
 int  runAsServer(int portno, gamestate_t *state)
 {
 	int sockfd, newsockfd, clilen;
-	char buffer[256];
-	char newBuffer[1024];
+	char buffer[MAX];
+	char newBuffer[MAX];
 
 	struct sockaddr_in serv_addr, cli_addr;
 	int n;
@@ -110,8 +103,11 @@ int  runAsServer(int portno, gamestate_t *state)
 	
 	listen(sockfd, 10);
 	clilen = sizeof(cli_addr);
-	while(run){
+
 	int data = 0;
+
+	while(run)
+	{
 
 		newsockfd = accept(sockfd, (struct sockaddr*)&cli_addr, &clilen);
 
@@ -120,12 +116,12 @@ int  runAsServer(int portno, gamestate_t *state)
 			error("Error in Accepting");
 		}
 
-		bzero(buffer, 256);
+		bzero(buffer, MAX);
 
 		while(run)
 		{
 
-			n = recv(newsockfd, buffer, 255, MSG_DONTWAIT);	
+			n = recv(newsockfd, buffer, MAX, MSG_DONTWAIT);	
 
 			if(n > 0)
 			{
@@ -137,27 +133,31 @@ int  runAsServer(int portno, gamestate_t *state)
 		state->ballx = buffer[0];
 		state->bally = buffer[1];
 		data  = initializeGameSetUp(state);
-
-		newBuffer[0] = data;		//When the ball reaches the end of screen, data has the X coordinate of the ball
-		newBuffer[1] = 7;		// When the ball reaches the end of scree, the Y coordinate is 7
-		newBuffer[2] = scorePlayer;	//score of the player
-
-		n = send(newsockfd, newBuffer, strlen(newBuffer), 0);
-		if(n < 0)
+		
+		if(data != 0)
 		{
-			error("Error writing to socket");
+			newBuffer[0] = data;	
+			newBuffer[1] = 7;		
+			newBuffer[2] = scorePlayer;
+			printf("Data: %d", data);
+
+			n = send(newsockfd, newBuffer, strlen(newBuffer), 0);
+			if(n < 0)
+			{
+				error("Error writing to socket");
+			}
+
+			printf("\nMessage Sent %d", scorePlayer);
+
 		}
-
-		printf("\nMessage Sent %d", scorePlayer);
-
 	}
+
 	close(newsockfd);
 	close(sockfd);
 	
 	return 1;
 }
 
-//function to run as client if 3 arguments are passed
 int runAsClient(int portno, char* IP_addr, gamestate_t *state)
 {
 	int sockfd, n;
@@ -193,18 +193,17 @@ int runAsClient(int portno, char* IP_addr, gamestate_t *state)
 	}
 
 	initGame(state);
-	while(run){
+	
 	int data = initializeGameSetUp(state);
 
+	while(run){
 	if(data != 0)
 	{
-		//The two statements below is to check whether the client side runs using the GET request from browser.
-	//	strcpy(buffer, "GET/\r\n\r\n");
-	//	strcat(buffer, IP_addr);
 	
-		buffer[0] = data;		// When the ball reaches the end of screen the value stored in data is the X coordinate
-		buffer[1] = 7; 			// When the ball reaches the end of screen the Y coordinate is 7
-		buffer[3] = scorePlayer;	// Sends the score
+		buffer[0] = data;	
+		buffer[1] = 7; 		
+		buffer[2] = scorePlayer;
+		printf("DATA: %d", data);			
 
 		n = send(sockfd,buffer,strlen(buffer),0);
 		if(n<0)
@@ -212,7 +211,7 @@ int runAsClient(int portno, char* IP_addr, gamestate_t *state)
 			error("ERROR writing to socket");
 		}
 
-		bzero(buffer,4096);
+		bzero(buffer,MAX);
 
 		while(run)
 		{
@@ -235,8 +234,6 @@ int runAsClient(int portno, char* IP_addr, gamestate_t *state)
 	return 1;
 }
 
-//Keeps account of event.
-//Event occurs when the joystick is pressed
 void callbackFn(unsigned int code)
 {
 	switch(code)
@@ -321,9 +318,8 @@ int  moveBall(sense_fb_bitmap_t *screen, gamestate_t *state, int paddle_x)
 		ballXVel = 1;
 	}
 
-	if(y == 7)
+	if(y == 8)
 	{
-//		clearBitmap(fb->bitmap, 0); // Clears the screen when the ball leaves the player's side
 		drawPaddle(screen, paddle_x, getColor(0, 0, 255));
 		return x;		    
 	}
