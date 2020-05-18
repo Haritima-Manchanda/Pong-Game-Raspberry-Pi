@@ -79,8 +79,97 @@ int bindCreatedSocket(int server_socket, int portno)
 	return n;
 }
 
+//Detects collision with paddle
+int collision(int paddle_xpos, int ball_xpos)
+{
+ 
+	if(ball_xpos >= paddle_xpos && ball_xpos <= (paddle_xpos + 2))
+	{
+		scorePlayer++;
+		return 1;
+	}
+	else
+	{
+		return 0;
+	}
+}
 
-int  runAsServer(int portno, gamestate_t *state)
+void drawPaddle(sense_fb_bitmap_t *screen, int startingPaddleIndex, uint16_t color)
+{
+	clearBitmap(fb->bitmap, getColor(0,0,0));
+
+	int i = startingPaddleIndex;
+	int count = 0; // Number of paddle dots 
+
+	while(i < 8 && i >= 0 && count < 3)
+	{
+		setPixel(screen, i, 0, color);
+		i++;
+		count++;
+	}
+}
+
+//Function to generate random movement of the ball
+int generate_random()
+{
+	return (rand() % 3) - 3;
+}
+
+void drawBall(sense_fb_bitmap_t *screen, gamestate_t *state, uint16_t color)
+{     
+	setPixel(screen, state->ballxprev, state->ballyprev,0);
+	setPixel(screen, state->ballx, state->bally, color);
+}
+
+int  moveBall(sense_fb_bitmap_t *screen, gamestate_t *state, int paddle_x)
+{
+
+	int x = state->ballx;
+	int y = state->bally;
+
+	state->ballxprev = state->ballx;
+	state->ballyprev = state->bally;
+
+	if(x >= 7)
+	{
+		ballXVel = -1;
+	}
+
+	if(x <= 0)
+	{
+		ballXVel = 1;
+	}
+
+	if(y >= 7 && ballYVel == 1)
+	{
+		drawPaddle(screen, paddle_x, getColor(0, 0, 255));
+		return x;		    
+	}
+	else if(y >=7 && ballYVel == 0)
+	{
+		ballYVel = -1;
+		state->ballx += generate_random();
+	}
+	else if(y <= 1 && collision(paddle_x,x))
+	{
+		ballYVel = 1;
+		state->ballx += generate_random();
+	}
+
+	else if(y <= 1 && (collision(paddle_x,x) == 0))
+	{
+		run = 0; // If the player misses the ball, the game ends
+	}
+
+	state->ballx += ballXVel;
+	state->bally += ballYVel;
+
+	usleep(300000); // Used to reduce the speed of the ball
+
+	return 0;
+}
+
+int  runAsServer(sense_fb_bitmap_t *screen, int portno, gamestate_t *state, int paddle_x)
 {
 	int sockfd, newsockfd, clilen;
 	char buffer[MAX];
@@ -132,6 +221,7 @@ int  runAsServer(int portno, gamestate_t *state)
 
 		state->ballx = buffer[0];
 		state->bally = buffer[1];
+
 		data  = initializeGameSetUp(state);
 		
 		if(data != 0)
@@ -257,91 +347,9 @@ void initGame(gamestate_t *game)
 }
 
 
-void drawPaddle(sense_fb_bitmap_t *screen, int startingPaddleIndex, uint16_t color)
-{
-	clearBitmap(fb->bitmap, getColor(0,0,0));
 
-	int i = startingPaddleIndex;
-	int count = 0; // Number of paddle dots 
 
-	while(i < 8 && i >= 0 && count < 3)
-	{
-		setPixel(screen, i, 0, color);
-		i++;
-		count++;
-	}
-}
 
-void drawBall(sense_fb_bitmap_t *screen, gamestate_t *state, uint16_t color)
-{     
-	setPixel(screen, state->ballxprev, state->ballyprev,0);
-	setPixel(screen, state->ballx, state->bally, color);
-}
-
-//Function to generate random movement of the ball
-int generate_random()
-{
-	return (rand() % 3) - 3;
-}
-
-//Detects collision with paddle
-int collision(int paddle_xpos, int ball_xpos)
-{
- 
-	if(ball_xpos >= paddle_xpos && ball_xpos <= (paddle_xpos + 2))
-	{
-		scorePlayer++;
-		return 1;
-	}
-	else
-	{
-		return 0;
-	}
-}
-
-int  moveBall(sense_fb_bitmap_t *screen, gamestate_t *state, int paddle_x)
-{
-
-	int x = state->ballx;
-	int y = state->bally;
-
-	state->ballxprev = state->ballx;
-	state->ballyprev = state->bally;
-
-	if(x >= 7)
-	{
-		ballXVel = -1;
-	}
-
-	if(x <= 0)
-	{
-		ballXVel = 1;
-	}
-
-	if(y == 8)
-	{
-		drawPaddle(screen, paddle_x, getColor(0, 0, 255));
-		return x;		    
-	}
-
-	else if(y <= 1 && collision(paddle_x,x))
-	{
-		ballYVel = 1;
-		state->ballx+=generate_random();
-	}
-
-	else if(y <= 1 && (collision(paddle_x,x) == 0))
-	{
-		run = 0; // If the player misses the ball, the game ends
-	}
-
-	state->ballx += ballXVel;
-	state->bally += ballYVel;
-
-	usleep(200000); // Used to reduce the speed of the ball
-
-	return 0;
-}
 
 int  movePaddle(sense_fb_bitmap_t *screen, int direction)
 {
@@ -363,13 +371,17 @@ int main(int argc, char* argv[])
 	int portno, i;
 
 	gamestate_t game;
-//	initGame(&game);
+	fb = getFBDevice();
+	if(!fb)
+	{
+		return 0;
+	}
 
 	if(argc == 2)
 	{
 		printf("\n Initializing as Server...");
 		portno = atoi(argv[1]);
-		serverRunning = runAsServer(portno, &game);
+		serverRunning = runAsServer(fb->bitmap, portno, &game,startingPaddleIndex);
 	}
 	
 	else if(argc == 3)
@@ -394,14 +406,13 @@ int initializeGameSetUp(gamestate_t *state)
 
 	signal(SIGINT, handler);
 
-	fb = getFBDevice();
 	pi_joystick_t* joystick = getJoystickDevice();
 
-	if(!fb)
+/*	if(!fb)
 	{
 		return 0;
 	}
-
+*/
 	clearBitmap(fb->bitmap, 0);
 
 	drawPaddle(fb->bitmap,startingPaddleIndex, getColor(0,0,255));
@@ -419,7 +430,7 @@ int initializeGameSetUp(gamestate_t *state)
 			{
 				drawBall(fb->bitmap,state, getColor(255,0,0));
 
-				int data = moveBall(fb->bitmap,state, startingPaddleIndex);
+				int data = moveBall(fb->bitmap, state, startingPaddleIndex);
 				if(data != 0)
 				{
 					return data;
