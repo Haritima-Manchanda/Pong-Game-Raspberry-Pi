@@ -111,8 +111,7 @@ int  runAsServer(int portno, gamestate_t *state)
 	clilen = sizeof(cli_addr);
 
 	int data = 0;
-	while(1)
-	{
+	
 
 		newsockfd = accept(sockfd, (struct sockaddr*)&cli_addr, &clilen);
 
@@ -150,7 +149,7 @@ int  runAsServer(int portno, gamestate_t *state)
 		}
 
 		printf("\nMessage Sent %d", scorePlayer);
-	}
+	
 	close(newsockfd);
 	close(sockfd);
 
@@ -192,8 +191,7 @@ int runAsClient(int portno, char* IP_addr, gamestate_t *state)
 		error("ERROR connecting");
 	}
 
-	while(1)
-	{
+	
 	int data = initializeGameSetUp(state);
 
 	if(data != 0)
@@ -228,7 +226,7 @@ int runAsClient(int portno, char* IP_addr, gamestate_t *state)
 		state->bally = (int)buffer[1];
 		data = initializeGameSetUp(state);
 	}
-	}
+
 
 	close(sockfd);
 
