@@ -15,7 +15,6 @@
 // SPEED: the speed of the paddle with which it moves when joystick is pressed either left or right. 
 #define SPEED 1
 #define MAX 4096
-int  initializeGameSetUp();
 
 //GLOBAL VARIABLES
 //run: Keeps account of whether the program is running.
@@ -45,6 +44,7 @@ typedef struct
 	int ballyprev;
 }gamestate_t;
 
+int initializeGameSetUp(gamestate_t *state);
 // handler() : Exits the program on ctrl C
 void handler(int sig)
 {
@@ -86,7 +86,7 @@ int bindCreatedSocket(int server_socket, int portno)
 }
 
 //function to run as server if only 2 arguments are passed
-int  runAsServer(int portno)
+int  runAsServer(int portno, gamestate_t *state)
 {
 	int sockfd, newsockfd, clilen;
 	char buffer[256];
@@ -110,10 +110,10 @@ int  runAsServer(int portno)
 	listen(sockfd, 10);
 	clilen = sizeof(cli_addr);
 
-	int data = initializeGameSetUp();
-
-	if(data != 0)
+	int data = 0;
+	while(1)
 	{
+
 		newsockfd = accept(sockfd, (struct sockaddr*)&cli_addr, &clilen);
 
 		if(newsockfd < 0)
@@ -135,7 +135,9 @@ int  runAsServer(int portno)
 	
 		}
 
-		printf("Here is the message: %s\n", buffer);
+		state->ballx = buffer[0];
+		state->bally = buffer[1];
+		data  = initializeGameSetUp(state);
 
 		newBuffer[0] = data;		//When the ball reaches the end of screen, data has the X coordinate of the ball
 		newBuffer[1] = 7;		// When the ball reaches the end of scree, the Y coordinate is 7
@@ -147,7 +149,7 @@ int  runAsServer(int portno)
 			error("Error writing to socket");
 		}
 
-		printf("\nMessage Sent %s\n", newBuffer);
+		printf("\nMessage Sent %d", scorePlayer);
 	}
 	close(newsockfd);
 	close(sockfd);
@@ -156,7 +158,7 @@ int  runAsServer(int portno)
 }
 
 //function to run as client if 3 arguments are passed
-int runAsClient(int portno, char* IP_addr)
+int runAsClient(int portno, char* IP_addr, gamestate_t *state)
 {
 	int sockfd, n;
 	struct sockaddr_in serv_addr;
@@ -190,7 +192,9 @@ int runAsClient(int portno, char* IP_addr)
 		error("ERROR connecting");
 	}
 
-	int data = initializeGameSetUp();
+	while(1)
+	{
+	int data = initializeGameSetUp(state);
 
 	if(data != 0)
 	{
@@ -220,7 +224,10 @@ int runAsClient(int portno, char* IP_addr)
 			}
 		}
 
-		printf("%s\n", buffer);
+		state->ballx = (int)buffer[0];
+		state->bally = (int)buffer[1];
+		data = initializeGameSetUp(state);
+	}
 	}
 
 	close(sockfd);
@@ -357,36 +364,39 @@ int  movePaddle(sense_fb_bitmap_t *screen, int direction)
 int main(int argc, char* argv[])
 {
 	int portno, i;
-	int paddleSpeed = 0;
+
+	gamestate_t game;
+	initGame(&game);
 
 	if(argc == 2)
 	{
 		printf("\n Initializing as Server...");
 		portno = atoi(argv[1]);
-		serverRunning = runAsServer(portno);
+		serverRunning = runAsServer(portno, &game);
 	}
 	
 	else if(argc == 3)
 	{
 		printf("\n Initializing as client...");
 		portno = atoi(argv[1]);
-		clientRunning = runAsClient(portno, argv[2]);
+		clientRunning = runAsClient(portno, argv[2], &game);
 	}
 	else
 	{
 		error("\nWrong number of arguments provided...");
 	}
+
 	return 0;
 }
 
-int initializeGameSetUp()
+int initializeGameSetUp(gamestate_t *state)
 {
+	int paddleSpeed = 0;
 
 	pi_i2c_t *device;
 	coordinate_t data;
 
-	gamestate_t game;
-	initGame(&game);
+	initGame(state);
 
 	signal(SIGINT, handler);
 
@@ -401,7 +411,7 @@ int initializeGameSetUp()
 	clearBitmap(fb->bitmap, 0);
 
 	drawPaddle(fb->bitmap,startingPaddleIndex, getColor(0,0,255));
-	drawBall(fb->bitmap, &game,getColor(255,0,0));
+	drawBall(fb->bitmap, state, getColor(255,0,0));
 
 	device = geti2cDevice();
 
@@ -413,9 +423,9 @@ int initializeGameSetUp()
 
 			while(run)
 			{
-				drawBall(fb->bitmap, &game, getColor(255,0,0));
+				drawBall(fb->bitmap,state, getColor(255,0,0));
 
-				int data = moveBall(fb->bitmap, &game, startingPaddleIndex);
+				int data = moveBall(fb->bitmap,state, startingPaddleIndex);
 				if(data != 0)
 				{
 					return data;
