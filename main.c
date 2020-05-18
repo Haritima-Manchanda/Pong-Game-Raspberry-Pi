@@ -63,17 +63,11 @@ char* ballPositionSent(gamestate_t *state, int paddle_x)
 
 	static char data[MAX]; // It is not a good idea to return the address of a local variable outside the function,
        			      //so we would have to define the local variable as static. 
+	
+	data[0] = x;
+	data[1] = y;
 
-	if(y == 7)// && (collision(paddle_x, x) == 1))
-	{	
-		strcat(data,(char*)x);
-		strcat(data,(char*)y);
-		return data;
-	}
-	else
-	{
-		return NULL;
-	}
+	return data;
 
 }
 
@@ -125,7 +119,6 @@ int  runAsServer(int portno)
 	clilen = sizeof(cli_addr);
 
 	
-	
 	newsockfd = accept(sockfd, (struct sockaddr*)&cli_addr, &clilen);
 
 	if(newsockfd < 0)
@@ -148,6 +141,7 @@ int  runAsServer(int portno)
 	}
 
 	printf("Here is the message: %s\n", buffer);
+
 
 	n = send(newsockfd, "I got your message", 18, 0);
 	if(n < 0)
@@ -196,9 +190,8 @@ int runAsClient(int portno, char* IP_addr)
 		error("ERROR connecting");
 	}
 
-	strcpy(buffer, "GET /\r\n\r\n");
+	strcpy(buffer, "GET/\r\n\r\n");
 	strcat(buffer, IP_addr);
-
 	n = send(sockfd,buffer,strlen(buffer),0);
 	if(n<0)
 	{
@@ -206,6 +199,7 @@ int runAsClient(int portno, char* IP_addr)
 	}
 
 	bzero(buffer, 4096);
+
 	while(1)
 	{
 		n = recv(sockfd,buffer ,sizeof(buffer),MSG_DONTWAIT);
@@ -215,6 +209,7 @@ int runAsClient(int portno, char* IP_addr)
 			break;
 		}
 	}
+
 	printf("%s\n", buffer);
 	close(sockfd);
 
@@ -286,7 +281,7 @@ int collision(int paddle_xpos, int ball_xpos)
 	}
 }
 
-void moveBall(gamestate_t *state, int paddle_x)
+void moveBall(sense_fb_bitmap_t *screen, gamestate_t *state, int paddle_x)
 {
 
 	int x = state->ballx;
@@ -299,20 +294,25 @@ void moveBall(gamestate_t *state, int paddle_x)
 	{
 		ballXVel = -1;
 	}
+
 	if(x <= 0)
 	{
 		ballXVel = 1;
 	}
-	if(y >= 6)
+
+	if(y >= 7)
 	{
-		ballYVel=-1;
-		state->ballx+=generate_random();
-	}	
+		char data[MAX];
+		clearBitmap(fb->bitmap, 0);
+		strcpy(data,  ballPositionSent(state, paddle_x));
+	}
+
 	else if(y <= 1 && collision(paddle_x,x))
 	{
 		ballYVel = 1;
 		state->ballx+=generate_random();
 	}
+
 	else if(y <= 1 && (collision(paddle_x,x) == 0))
 	{
 		run = 0;
@@ -363,7 +363,7 @@ int main(int argc, char* argv[])
 		error("\nWrong number of arguments provided...");
 	}
 
-	if(serverRunning == 1 || clientRunning == 1)
+	if((serverRunning == 1 && clientRunning == 0) || (clientRunning == 1 && serverRunning == 0))
 	{
 		pi_i2c_t *device;
 		coordinate_t data;
@@ -390,7 +390,6 @@ int main(int argc, char* argv[])
 
 		if(device)
 		{
-			configureAccelGyro(device);
 			while(run)
 			{
 				usleep(2000);
@@ -398,7 +397,7 @@ int main(int argc, char* argv[])
 				while(run)
 				{
 					drawBall(fb->bitmap, &game, getColor(255,0,0));
-					moveBall(&game,startingPaddleIndex);
+					moveBall(fb->bitmap, &game,startingPaddleIndex);
 
 					pollJoystick(joystick, callbackFn, 0);
 					if(runJoyStick == 1 || runJoyStick == -1)
