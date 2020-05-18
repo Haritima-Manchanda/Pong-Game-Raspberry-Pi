@@ -45,6 +45,7 @@ typedef struct
 }gamestate_t;
 
 int initializeGameSetUp(gamestate_t *state);
+void initGame(gamestate_t *state);
 // handler() : Exits the program on ctrl C
 void handler(int sig)
 {
@@ -109,9 +110,8 @@ int  runAsServer(int portno, gamestate_t *state)
 	
 	listen(sockfd, 10);
 	clilen = sizeof(cli_addr);
-
+	while(run){
 	int data = 0;
-	
 
 		newsockfd = accept(sockfd, (struct sockaddr*)&cli_addr, &clilen);
 
@@ -122,7 +122,7 @@ int  runAsServer(int portno, gamestate_t *state)
 
 		bzero(buffer, 256);
 
-		while(1)
+		while(run)
 		{
 
 			n = recv(newsockfd, buffer, 255, MSG_DONTWAIT);	
@@ -149,10 +149,11 @@ int  runAsServer(int portno, gamestate_t *state)
 		}
 
 		printf("\nMessage Sent %d", scorePlayer);
-	
+
+	}
 	close(newsockfd);
 	close(sockfd);
-
+	
 	return 1;
 }
 
@@ -191,7 +192,8 @@ int runAsClient(int portno, char* IP_addr, gamestate_t *state)
 		error("ERROR connecting");
 	}
 
-	
+	initGame(state);
+	while(run){
 	int data = initializeGameSetUp(state);
 
 	if(data != 0)
@@ -212,7 +214,7 @@ int runAsClient(int portno, char* IP_addr, gamestate_t *state)
 
 		bzero(buffer,4096);
 
-		while(1)
+		while(run)
 		{
 			n = recv(sockfd,buffer ,sizeof(buffer),MSG_DONTWAIT);
 		
@@ -226,7 +228,7 @@ int runAsClient(int portno, char* IP_addr, gamestate_t *state)
 		state->bally = (int)buffer[1];
 		data = initializeGameSetUp(state);
 	}
-
+	}
 
 	close(sockfd);
 
@@ -321,7 +323,8 @@ int  moveBall(sense_fb_bitmap_t *screen, gamestate_t *state, int paddle_x)
 
 	if(y == 7)
 	{
-		clearBitmap(fb->bitmap, 0); // Clears the screen when the ball leaves the player's side
+//		clearBitmap(fb->bitmap, 0); // Clears the screen when the ball leaves the player's side
+		drawPaddle(screen, paddle_x, getColor(0, 0, 255));
 		return x;		    
 	}
 
@@ -364,7 +367,7 @@ int main(int argc, char* argv[])
 	int portno, i;
 
 	gamestate_t game;
-	initGame(&game);
+//	initGame(&game);
 
 	if(argc == 2)
 	{
@@ -392,9 +395,6 @@ int initializeGameSetUp(gamestate_t *state)
 	int paddleSpeed = 0;
 
 	pi_i2c_t *device;
-	coordinate_t data;
-
-	initGame(state);
 
 	signal(SIGINT, handler);
 
