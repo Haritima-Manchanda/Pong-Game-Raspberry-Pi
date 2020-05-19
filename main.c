@@ -166,14 +166,13 @@ int  moveBall(sense_fb_bitmap_t *screen, gamestate_t *state, int paddle_x)
 
 	usleep(300000); // Used to reduce the speed of the ball
 
-	return 0;
+	return -1;
 }
 
 int  runAsServer(sense_fb_bitmap_t *screen, int portno, gamestate_t *state, int paddle_x)
 {
 	int sockfd, newsockfd, clilen;
-	char buffer[MAX];
-	char newBuffer[MAX];
+	char  buffer[MAX];
 
 	struct sockaddr_in serv_addr, cli_addr;
 	int n;
@@ -195,16 +194,16 @@ int  runAsServer(sense_fb_bitmap_t *screen, int portno, gamestate_t *state, int 
 
 	int data = 0;
 
-	while(run)
-	{
-
-		newsockfd = accept(sockfd, (struct sockaddr*)&cli_addr, &clilen);
+	newsockfd = accept(sockfd, (struct sockaddr*)&cli_addr, &clilen);
 
 		if(newsockfd < 0)
 		{
 			error("Error in Accepting");
 		}
 
+	while(run)
+	{
+		
 		bzero(buffer, MAX);
 
 		while(run)
@@ -219,27 +218,27 @@ int  runAsServer(sense_fb_bitmap_t *screen, int portno, gamestate_t *state, int 
 	
 		}
 
-		state->ballx = buffer[0];
-		state->bally = buffer[1];
+		state->ballx = (int)(buffer[0]);
+		state->bally = (int)(buffer[1]);
 
 		data  = initializeGameSetUp(state);
 		
-		if(data != 0)
+		if(data > -1)
 		{
-			newBuffer[0] = data;	
-			newBuffer[1] = 7;		
-			newBuffer[2] = scorePlayer;
-			printf("Data: %d", data);
+			buffer[0] = data;	
+			buffer[1] = 7;		
+			buffer[2] = scorePlayer;
 
-			n = send(newsockfd, newBuffer, strlen(newBuffer), 0);
+			printf("BUFFER %d\n", buffer[0]);
+			n = send(newsockfd, buffer,3, 0);
 			if(n < 0)
 			{
 				error("Error writing to socket");
 			}
-
 			printf("\nMessage Sent %d", scorePlayer);
 
 		}
+		run = 0;
 	}
 
 	close(newsockfd);
@@ -255,6 +254,7 @@ int runAsClient(int portno, char* IP_addr, gamestate_t *state)
 	struct hostent *server;
 
 	char buffer[MAX];
+	char newBuffer[MAX];
 
 	sockfd = socketCreate();
 
@@ -287,7 +287,7 @@ int runAsClient(int portno, char* IP_addr, gamestate_t *state)
 	int data = initializeGameSetUp(state);
 
 	while(run){
-	if(data != 0)
+	if(data > -1)
 	{
 	
 		buffer[0] = data;	
@@ -295,7 +295,7 @@ int runAsClient(int portno, char* IP_addr, gamestate_t *state)
 		buffer[2] = scorePlayer;
 		printf("DATA: %d", data);			
 
-		n = send(sockfd,buffer,strlen(buffer),0);
+		n = send(sockfd,buffer, 3 ,0);
 		if(n<0)
 		{
 			error("ERROR writing to socket");
@@ -305,18 +305,17 @@ int runAsClient(int portno, char* IP_addr, gamestate_t *state)
 
 		while(run)
 		{
-			n = recv(sockfd,buffer ,sizeof(buffer),MSG_DONTWAIT);
-		
+			n = recv(sockfd, newBuffer ,sizeof(newBuffer),MSG_DONTWAIT);	
 			if(n > 0)
 			{
 				break;
 			}
 		}
 
-		state->ballx = (int)buffer[0];
-		state->bally = (int)buffer[1];
-		data = initializeGameSetUp(state);
+		state->ballx = (int)newBuffer[0];
+		state->bally = (int)newBuffer[1];
 	}
+	data = initializeGameSetUp(state);
 	}
 
 	close(sockfd);
@@ -346,11 +345,6 @@ void initGame(gamestate_t *game)
 	game->ballx = game->bally = game->ballxprev = game->ballyprev = 1;
 }
 
-
-
-
-
-
 int  movePaddle(sense_fb_bitmap_t *screen, int direction)
 {
 	int paddleX = 0;
@@ -376,7 +370,7 @@ int main(int argc, char* argv[])
 	{
 		return 0;
 	}
-
+	
 	if(argc == 2)
 	{
 		printf("\n Initializing as Server...");
@@ -402,17 +396,14 @@ int initializeGameSetUp(gamestate_t *state)
 {
 	int paddleSpeed = 0;
 
+	
+
 	pi_i2c_t *device;
 
 	signal(SIGINT, handler);
 
 	pi_joystick_t* joystick = getJoystickDevice();
 
-/*	if(!fb)
-	{
-		return 0;
-	}
-*/
 	clearBitmap(fb->bitmap, 0);
 
 	drawPaddle(fb->bitmap,startingPaddleIndex, getColor(0,0,255));
