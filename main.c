@@ -166,7 +166,7 @@ int  moveBall(sense_fb_bitmap_t *screen, gamestate_t *state, int paddle_x)
 
 	usleep(300000); // Used to reduce the speed of the ball
 
-	return -1;
+	return 0;
 }
 
 int  runAsServer(sense_fb_bitmap_t *screen, int portno, gamestate_t *state, int paddle_x)
@@ -194,16 +194,15 @@ int  runAsServer(sense_fb_bitmap_t *screen, int portno, gamestate_t *state, int 
 
 	int data = 0;
 
-	newsockfd = accept(sockfd, (struct sockaddr*)&cli_addr, &clilen);
+	while(run)
+	{
+		newsockfd = accept(sockfd, (struct sockaddr*)&cli_addr, &clilen);
 
 		if(newsockfd < 0)
 		{
 			error("Error in Accepting");
 		}
-
-	while(run)
-	{
-		
+	
 		bzero(buffer, MAX);
 
 		while(run)
@@ -223,14 +222,14 @@ int  runAsServer(sense_fb_bitmap_t *screen, int portno, gamestate_t *state, int 
 
 		data  = initializeGameSetUp(state);
 		
-		if(data > -1)
+		if(data != 0)
 		{
 			buffer[0] = data;	
 			buffer[1] = 7;		
 			buffer[2] = scorePlayer;
 
 			printf("BUFFER %d\n", buffer[0]);
-			n = send(newsockfd, buffer,3, 0);
+			n = send(newsockfd, buffer,strlen(buffer), 0);
 			if(n < 0)
 			{
 				error("Error writing to socket");
@@ -287,7 +286,7 @@ int runAsClient(int portno, char* IP_addr, gamestate_t *state)
 	int data = initializeGameSetUp(state);
 
 	while(run){
-	if(data > -1)
+	if(data != 0)
 	{
 	
 		buffer[0] = data;	
@@ -295,7 +294,7 @@ int runAsClient(int portno, char* IP_addr, gamestate_t *state)
 		buffer[2] = scorePlayer;
 		printf("DATA: %d", data);			
 
-		n = send(sockfd,buffer, 3 ,0);
+		n = send(sockfd,buffer,strlen(buffer),0);
 		if(n<0)
 		{
 			error("ERROR writing to socket");
