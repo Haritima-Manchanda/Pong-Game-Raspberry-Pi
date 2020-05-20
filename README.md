@@ -34,4 +34,5 @@ Once a connection is established, you will have to have both sides loop doing no
 Once you receive something (or send something), you can leave the loop and use blocking calls (with flag set to 0) to handle expected communication.
 
 ### 3.STEP 3: Program Description
-    A simple game: The program implements a game of pong where each screen is half of the court.  Use the joystick to control the paddle.  When the ball leaves the right side of your screen, send a message with it's location, direction, etc and have the other side pick up playing the game from that point (until someone misses).  Then send a message to the other side to update scores.  Keep score and print to the console on the Pi (i.e. with printf).
+
+A simple game: The program implements a game of pong where each screen is half of the court.  Use the joystick to control the paddle.  When the ball leaves the right side of your screen, send a message with it's location, direction, etc and have the other side pick up playing the game from that point (until someone misses).  Then send a message to the other side to update scores.  Keep score and print to the console on the Pi (i.e. with printf).
