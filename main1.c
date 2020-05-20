@@ -1,5 +1,5 @@
 // NAME: HARITIMA MANCHANDA CISC 210(HONORS) LAB 7
-//FILE: main1.c
+// FILE: main1.c
 // DESCRIPTION: The program creates a socket to a web server.
 // Tested with www.google.com 80 /
 
