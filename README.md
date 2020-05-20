@@ -1,6 +1,6 @@
 # CISC-210 FINAL-PROJECT
-TEAM MEMBERS: Haritima Manchanda, Becky Ren
-SECTION: CISC-210 (HONORS)
+### TEAM MEMBERS: Haritima Manchanda, Becky Ren
+### SECTION: CISC-210 (HONORS)
 
 ## BASIC OVERVIEW
 In this project we had put together all of the concepts we have learned this semester to create a single client/server application that operates between two Raspberry Pi's and makes use of the led grid, and the joystick. The two Raspberry Pi's will connect, and send commands and responses back and forth between them to implement the program.
@@ -8,7 +8,8 @@ In this project we had put together all of the concepts we have learned this sem
 ## PROJECT IMPLEMENTATION
 
 ### 1. STEP 1: Connecting our Pi's
-    Since we are all at home right now, our Raspberry Pi/s are behind a firewall.  To circumvent this we will use a feature of ssh that allows us to set up tunnels to redirect a port on our machine to a port on a remote machine and vice-versa.  Our application will support operation in both client and server mode, but one side will have to act as the server.  The side that is acting as the server will redirect a port on go.eecis.udel.edu to a port on their local machine.  The side that is acting as the client will redirect a port on their machine to a port on go.eecis.udel.edu.  Then the client machine will connect to localhost/port and the magic of ssh will redirect it to the server's raspberry Pi.
+
+Since we are at homes, our Raspberry Pi/s are behind a firewall.  To circumvent this we will use a feature of ssh that allows us to set up tunnels to redirect a port on our machine to a port on a remote machine and vice-versa.  Our application will support operation in both client and server mode, but one side will have to act as the server.  The side that is acting as the server will redirect a port on go.eecis.udel.edu to a port on their local machine.  The side that is acting as the client will redirect a port on their machine to a port on go.eecis.udel.edu.  Then the client machine will connect to localhost/port and the magic of ssh will redirect it to the server's raspberry Pi.
     An example:
 
 On the server side, the user executes this command:
@@ -22,7 +23,8 @@ The tunnel stays active until you log out.
 (Tested this with lab 7 and lab 8.  Server runs lab8 on port 8080.  client runs lab7 and uses localhost 8080 / as the parameters.)
  
 ### 2. STEP 2: The project
-    At the simplest level you are to write a program that takes either 2 or 3 arguments.
+
+At the simplest level you are to write a program that takes either 2 or 3 arguments.
 1) program <port>
 2) program <port> <IP or Server Name>
 
