@@ -3,6 +3,9 @@
 ### SECTION: CISC-210 (HONORS)
 
 ## BASIC OVERVIEW
+
+This project is for system's programming and socket programming in C language.
+
 In this project we had put together all of the concepts we have learned this semester to create a single client/server application that operates between two Raspberry Pi's and makes use of the led grid, and the joystick. The two Raspberry Pi's will connect, and send commands and responses back and forth between them to implement the program.
 
 ## PROJECT IMPLEMENTATION
